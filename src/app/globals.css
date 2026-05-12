@@ -44,16 +44,6 @@ a {
   color: white;
 }
 
-.magnetic-stage {
-  transform:
-    perspective(1800px)
-    rotateX(calc(var(--magnet-y) * -0.32deg))
-    rotateY(calc(var(--magnet-x) * 0.42deg))
-    translate3d(calc(var(--magnet-x) * -3px), calc(var(--magnet-y) * -3px), 0);
-  transform-origin: center top;
-  will-change: transform;
-}
-
 .magnetic-cursor {
   position: fixed;
   left: 0;
@@ -143,8 +133,6 @@ a {
 .hero-panel {
   position: relative;
   min-height: min(650px, 72vh);
-  transform-style: preserve-3d;
-  perspective: 1200px;
 }
 
 .hero-panel::before {
@@ -154,7 +142,7 @@ a {
   border: 1px solid rgba(176, 38, 255, 0.26);
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.09), rgba(255, 79, 216, 0.03));
   filter: blur(1px);
-  transform: translate3d(calc(var(--magnet-x) * 9px), calc(var(--magnet-y) * 7px), -60px);
+  transform: translate3d(calc(var(--magnet-x) * 5px), calc(var(--magnet-y) * 4px), 0);
   will-change: transform;
 }
 
@@ -177,10 +165,7 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.11);
   background: #0d1020;
   box-shadow: 0 34px 80px rgba(0, 0, 0, 0.46), 0 0 70px rgba(139, 92, 246, 0.2);
-  transform:
-    translate3d(calc(var(--magnet-x) * 10px), calc(var(--magnet-y) * 7px), 80px)
-    rotateY(calc(var(--magnet-x) * -1.4deg))
-    rotateX(calc(var(--magnet-y) * 1deg));
+  transform: translate3d(calc(var(--magnet-x) * 6px), calc(var(--magnet-y) * 4px), 0);
   will-change: transform;
 }
 
@@ -425,14 +410,12 @@ a {
 .equipment-card {
   min-height: 230px;
   padding: 1.25rem;
-  transform-style: preserve-3d;
   transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
 
 .equipment-card svg {
   color: #c4b5fd;
   filter: drop-shadow(0 0 16px rgba(176, 38, 255, 0.42));
-  transform: translateZ(28px);
 }
 
 .equipment-card h3 {
@@ -441,7 +424,7 @@ a {
 }
 
 .equipment-card:hover {
-  transform: rotateX(5deg) rotateY(-6deg) translateY(-5px) scale(1.02);
+  transform: translateY(-5px) scale(1.02);
   border-color: rgba(255, 79, 216, 0.42);
   box-shadow: 0 34px 70px rgba(0, 0, 0, 0.34), 0 0 54px rgba(176, 38, 255, 0.28);
 }
@@ -635,10 +618,6 @@ a {
   button,
   a {
     cursor: auto;
-  }
-
-  .magnetic-stage {
-    transform: none;
   }
 
   .hero-panel {

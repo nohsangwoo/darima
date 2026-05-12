@@ -41,6 +41,8 @@ const socialLinks: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Music2, label: "TikTok" },
 ];
 
+const heroVideoSources = ["/assets/ayame-hero.mp4", "/assets/ayame-hero-reverse.mp4"] as const;
+
 const profile = [
   ["Age", "21"],
   ["Rank", "Jounin / ANBU"],
@@ -533,8 +535,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<(typeof gallery)[number] | null>(null);
   const [heroProgress, setHeroProgress] = useState(0);
+  const [heroVideoIndex, setHeroVideoIndex] = useState(0);
   const heroRef = useRef<HTMLDivElement>(null);
-  const heroVideoRef = useRef<HTMLVideoElement>(null);
+  const heroVideoRefs = useRef<Array<HTMLVideoElement | null>>([]);
 
   useEffect(() => {
     const lenis = new Lenis({ lerp: 0.08, wheelMultiplier: 0.9 });
@@ -581,93 +584,28 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const video = heroVideoRef.current;
-    if (!video) {
-      return;
-    }
-
-    let reverseRaf = 0;
-    let lastFrameTime = 0;
-    let isDisposed = false;
-
-    const stopReverse = () => {
-      if (reverseRaf) {
-        cancelAnimationFrame(reverseRaf);
-        reverseRaf = 0;
-      }
-      lastFrameTime = 0;
-    };
-
-    const playForward = () => {
-      stopReverse();
-      video.playbackRate = 1;
-      video.loop = false;
-      const playPromise = video.play();
-      if (playPromise) {
-        playPromise.catch(() => {
-          // Autoplay can be blocked in unusual browser states; the muted video resumes on the next user gesture.
-        });
-      }
-    };
-
-    const reverseStep = (time: number) => {
-      if (isDisposed) {
+    heroVideoRefs.current.forEach((video, index) => {
+      if (!video) {
         return;
       }
 
-      if (!lastFrameTime) {
-        lastFrameTime = time;
-      }
-
-      const delta = (time - lastFrameTime) / 1000;
-      lastFrameTime = time;
-
-      if (!Number.isFinite(video.duration) || video.duration <= 0) {
-        reverseRaf = requestAnimationFrame(reverseStep);
-        return;
-      }
-
-      const nextTime = video.currentTime - delta;
-      if (nextTime <= 0.03) {
-        video.currentTime = 0;
-        playForward();
-        return;
-      }
-
-      video.currentTime = nextTime;
-      reverseRaf = requestAnimationFrame(reverseStep);
-    };
-
-    const playReverse = () => {
-      stopReverse();
-      video.pause();
-      if (Number.isFinite(video.duration)) {
-        video.currentTime = Math.min(video.currentTime, Math.max(video.duration - 0.04, 0));
-      }
-      reverseRaf = requestAnimationFrame(reverseStep);
-    };
-
-    const handleLoadedMetadata = () => {
       video.muted = true;
       video.loop = false;
-      video.currentTime = 0;
-      playForward();
-    };
 
-    video.addEventListener("ended", playReverse);
-    video.addEventListener("loadedmetadata", handleLoadedMetadata);
-
-    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      handleLoadedMetadata();
-    }
-
-    return () => {
-      isDisposed = true;
-      stopReverse();
-      video.removeEventListener("ended", playReverse);
-      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-    };
-  }, []);
+      if (index === heroVideoIndex) {
+        video.currentTime = 0;
+        const playPromise = video.play();
+        if (playPromise) {
+          playPromise.catch(() => {
+            // Muted autoplay normally succeeds; user gesture will recover unusual browser states.
+          });
+        }
+      } else {
+        video.pause();
+        video.currentTime = 0;
+      }
+    });
+  }, [heroVideoIndex]);
 
   return (
     <>
@@ -676,18 +614,27 @@ export default function Home() {
       <MagneticCursor />
       <Navbar />
 
-      <main className="magnetic-stage relative z-10 overflow-hidden bg-[#05060a] text-zinc-100">
+      <main className="relative z-10 overflow-hidden bg-[#05060a] text-zinc-100">
         <section id="hero" ref={heroRef} className="relative min-h-screen overflow-hidden pt-28">
-          <motion.video
-            ref={heroVideoRef}
-            className="absolute inset-0 h-full w-full object-cover opacity-55"
-            src="/assets/ayame-hero.mp4"
-            autoPlay
-            muted
-            preload="auto"
-            playsInline
-            style={{ transform: `scale(${1 + heroProgress * 0.16})`, opacity: 1 - heroProgress * 0.74 }}
-          />
+          {heroVideoSources.map((source, index) => (
+            <video
+              key={source}
+              ref={(element) => {
+                heroVideoRefs.current[index] = element;
+              }}
+              className="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+              src={source}
+              autoPlay={index === 0}
+              muted
+              preload="auto"
+              playsInline
+              onEnded={() => setHeroVideoIndex((current) => (current + 1) % heroVideoSources.length)}
+              style={{
+                transform: `scale(${1 + heroProgress * 0.16})`,
+                opacity: heroVideoIndex === index ? 1 - heroProgress * 0.74 : 0,
+              }}
+            />
+          ))}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,rgba(176,38,255,0.24),transparent_31%),linear-gradient(90deg,#05060a_0%,rgba(5,6,10,0.86)_38%,rgba(5,6,10,0.42)_68%,#05060a_100%)]" />
           <div className="absolute left-[12%] top-[16%] h-60 w-60 rounded-full border border-violet-300/10 bg-violet-400/10 blur-3xl moon-pulse" />
           <div className="scan-lines" />
