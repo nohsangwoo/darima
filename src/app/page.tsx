@@ -4,28 +4,41 @@ import { AnimatePresence, motion } from "framer-motion";
 import Lenis from "lenis";
 import {
   Activity,
+  AlertTriangle,
+  Building2,
   ChevronDown,
+  CheckCircle2,
   Crosshair,
   Database,
   Eye,
+  ExternalLink,
   Flame,
   Hexagon,
   Camera,
   Leaf,
+  LockKeyhole,
+  LoaderCircle,
+  Mail,
+  MapPin,
   Menu,
   Music2,
   Orbit,
+  Phone,
+  Play,
   Radio,
   ScrollText,
   Send,
   Shield,
   Sparkles,
   Swords,
+  Volume2,
+  VolumeX,
   X,
+  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 const navItems = [
   ["Home", "hero"],
@@ -41,7 +54,95 @@ const socialLinks: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Music2, label: "TikTok" },
 ];
 
-const heroVideoSources = ["/assets/ayame-hero.mp4", "/assets/ayame-hero-reverse.mp4"] as const;
+const siteUrl = "https://www.darima.xyz";
+
+const companyInfo = {
+  name: "주식회사 럿지",
+  englishName: "LUDGI Inc.",
+  ceo: "노상우",
+  founded: "2024",
+  businessNumber: "307-88-03283",
+  duns: "963415644",
+  address: "인천광역시 연수구 인천타워대로 323, 에이동 20층",
+  phone: "010-3006-9310",
+  email: "milli@molluhub.com",
+  homepage: "https://info.ludgi.ai/",
+  summary:
+    "공공기관 SI 수주와 30여 개 이상의 민간 프로젝트를 수행한 소프트웨어 개발 전문 기업입니다.",
+};
+
+const inquiryInitialState = {
+  name: "",
+  company: "",
+  email: "",
+  phone: "",
+  message: "",
+  website: "",
+};
+
+type InquiryForm = typeof inquiryInitialState;
+type InquiryStatus = "idle" | "sending" | "success" | "error";
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://info.ludgi.ai/#organization",
+      name: companyInfo.name,
+      alternateName: companyInfo.englishName,
+      url: companyInfo.homepage,
+      foundingDate: companyInfo.founded,
+      founder: {
+        "@type": "Person",
+        name: companyInfo.ceo,
+      },
+      email: companyInfo.email,
+      telephone: companyInfo.phone,
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: companyInfo.address,
+        postalCode: "21998",
+        addressCountry: "KR",
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
+      url: `${siteUrl}/`,
+      name: "Darima",
+      alternateName: ["럿지 랜딩페이지", "LUDGI Inc. homepage"],
+      inLanguage: "ko-KR",
+      publisher: {
+        "@id": "https://info.ludgi.ai/#organization",
+      },
+    },
+    {
+      "@type": "Service",
+      "@id": `${siteUrl}/#homepage-production`,
+      name: "홈페이지 및 랜딩페이지 제작문의",
+      serviceType: "Homepage and landing page production",
+      provider: {
+        "@id": "https://info.ludgi.ai/#organization",
+      },
+      areaServed: "KR",
+      url: `${siteUrl}/`,
+      description:
+        "Next.js 기반 인터랙티브 랜딩페이지, 홈페이지, 시네마틱 UX/UI 제작문의.",
+    },
+  ],
+};
+
+const heroVideoSources = [
+  {
+    desktop: "/assets/ayame-hero.mp4",
+    mobile: "/assets/ayame-hero-mobile.mp4",
+  },
+  {
+    desktop: "/assets/ayame-hero-reverse.mp4",
+    mobile: "/assets/ayame-hero-mobile-reverse.mp4",
+  },
+] as const;
 
 const profile = [
   ["Age", "21"],
@@ -536,8 +637,17 @@ export default function Home() {
   const [selectedImage, setSelectedImage] = useState<(typeof gallery)[number] | null>(null);
   const [heroProgress, setHeroProgress] = useState(0);
   const [heroVideoIndex, setHeroVideoIndex] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [skillActionActive, setSkillActionActive] = useState(false);
+  const [skillActionSoundEnabled, setSkillActionSoundEnabled] = useState(false);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const [inquiryForm, setInquiryForm] = useState<InquiryForm>(inquiryInitialState);
+  const [inquiryStatus, setInquiryStatus] = useState<InquiryStatus>("idle");
+  const [inquiryNotice, setInquiryNotice] = useState("");
   const heroRef = useRef<HTMLDivElement>(null);
+  const heroAudioRef = useRef<HTMLAudioElement>(null);
   const heroVideoRefs = useRef<Array<HTMLVideoElement | null>>([]);
+  const skillActionVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const lenis = new Lenis({ lerp: 0.08, wheelMultiplier: 0.9 });
@@ -607,8 +717,144 @@ export default function Home() {
     });
   }, [heroVideoIndex]);
 
+  const stopHeroSound = () => {
+    const audio = heroAudioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.pause();
+    setSoundEnabled(false);
+  };
+
+  const toggleHeroSound = () => {
+    const audio = heroAudioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    if (soundEnabled) {
+      stopHeroSound();
+      return;
+    }
+
+    audio.volume = 0.42;
+    audio.muted = false;
+    const playPromise = audio.play();
+    if (playPromise) {
+      playPromise
+        .then(() => setSoundEnabled(true))
+        .catch(() => setSoundEnabled(false));
+    } else {
+      setSoundEnabled(true);
+    }
+  };
+
+  const endSkillAction = () => {
+    const video = skillActionVideoRef.current;
+    if (video) {
+      video.pause();
+      video.currentTime = 0;
+      video.muted = true;
+    }
+    setSkillActionActive(false);
+    setSkillActionSoundEnabled(false);
+  };
+
+  const startSkillAction = () => {
+    stopHeroSound();
+    setSkillActionActive(true);
+    setSkillActionSoundEnabled(true);
+
+    const video = skillActionVideoRef.current;
+    if (!video) {
+      return;
+    }
+
+    video.currentTime = 0;
+    video.volume = 0.65;
+    video.muted = false;
+    const playPromise = video.play();
+    if (playPromise) {
+      playPromise.catch(() => {
+        video.muted = true;
+        setSkillActionSoundEnabled(false);
+        video.play().catch(() => endSkillAction());
+      });
+    }
+  };
+
+  const toggleSkillActionSound = () => {
+    const video = skillActionVideoRef.current;
+    if (!video) {
+      return;
+    }
+
+    if (skillActionSoundEnabled) {
+      video.muted = true;
+      setSkillActionSoundEnabled(false);
+      return;
+    }
+
+    video.volume = 0.65;
+    video.muted = false;
+    setSkillActionSoundEnabled(true);
+  };
+
+  const openInquiry = () => {
+    setInquiryOpen(true);
+    setInquiryStatus("idle");
+    setInquiryNotice("");
+  };
+
+  const closeInquiry = () => {
+    if (inquiryStatus !== "sending") {
+      setInquiryOpen(false);
+    }
+  };
+
+  const updateInquiry = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    setInquiryForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  };
+
+  const submitInquiry = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setInquiryStatus("sending");
+    setInquiryNotice("");
+
+    try {
+      const response = await fetch("/api/inquiry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(inquiryForm),
+      });
+      const result = (await response.json().catch(() => null)) as { message?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(result?.message || "문의 발송에 실패했습니다.");
+      }
+
+      setInquiryStatus("success");
+      setInquiryNotice("문의가 전송되었습니다. LUDGI 팀이 확인 후 연락드릴게요.");
+      setInquiryForm(inquiryInitialState);
+    } catch (error) {
+      setInquiryStatus("error");
+      setInquiryNotice(error instanceof Error ? error.message : "문의 발송에 실패했습니다.");
+    }
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <IntroLoader loading={loading} />
       <ParticleField />
       <MagneticCursor />
@@ -616,14 +862,14 @@ export default function Home() {
 
       <main className="relative z-10 overflow-hidden bg-[#05060a] text-zinc-100">
         <section id="hero" ref={heroRef} className="relative min-h-screen overflow-hidden pt-28">
+          <audio ref={heroAudioRef} src="/assets/ayame-hero.mp4" preload="auto" loop />
           {heroVideoSources.map((source, index) => (
             <video
-              key={source}
+              key={source.desktop}
               ref={(element) => {
                 heroVideoRefs.current[index] = element;
               }}
               className="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-              src={source}
               autoPlay={index === 0}
               muted
               preload="auto"
@@ -633,11 +879,24 @@ export default function Home() {
                 transform: `scale(${1 + heroProgress * 0.16})`,
                 opacity: heroVideoIndex === index ? 1 - heroProgress * 0.74 : 0,
               }}
-            />
+            >
+              <source src={source.mobile} type="video/mp4" media="(max-width: 767px)" />
+              <source src={source.desktop} type="video/mp4" />
+            </video>
           ))}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,rgba(176,38,255,0.24),transparent_31%),linear-gradient(90deg,#05060a_0%,rgba(5,6,10,0.86)_38%,rgba(5,6,10,0.42)_68%,#05060a_100%)]" />
           <div className="absolute left-[12%] top-[16%] h-60 w-60 rounded-full border border-violet-300/10 bg-violet-400/10 blur-3xl moon-pulse" />
           <div className="scan-lines" />
+          <button
+            type="button"
+            className="sound-toggle"
+            aria-label={soundEnabled ? "Turn hero background sound off" : "Turn hero background sound on"}
+            aria-pressed={soundEnabled}
+            onClick={toggleHeroSound}
+          >
+            {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            <span>{soundEnabled ? "Sound On" : "Sound Off"}</span>
+          </button>
 
           <div className="relative mx-auto grid min-h-[calc(100vh-112px)] w-[min(1180px,calc(100%-32px))] items-center gap-12 pb-20 lg:grid-cols-[0.92fr_1.08fr]">
             <motion.div
@@ -756,46 +1015,140 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="skills" className="section-wrap">
-          <SectionHeader
-            eyebrow="Forbidden Technique Documents"
-            title="Every technique leaves a violet afterimage."
-            copy="Hover the archive cards to expose the danger layer and ocular telemetry."
-          />
-          <div className="grid gap-4">
-            {skills.map((skill, index) => {
-              const Icon = skill.icon;
-              return (
-                <motion.article
-                  key={skill.name}
-                  className="skill-card group"
-                  initial={{ opacity: 0, x: index % 2 ? 30 : -30 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, margin: "-80px" }}
-                  transition={{ duration: 0.7, delay: index * 0.06 }}
+        <section id="skills" className="skill-stage">
+          <video className="skill-bg-video" src="/assets/skill-waiting.mp4" autoPlay muted loop playsInline preload="auto" />
+          <video
+            ref={skillActionVideoRef}
+            className="skill-action-video"
+            playsInline
+            preload="auto"
+            onEnded={endSkillAction}
+            style={{ opacity: skillActionActive ? 1 : 0 }}
+          >
+            <source src="/assets/skill-action-mobile.mp4" type="video/mp4" media="(max-width: 767px)" />
+            <source src="/assets/skill-action.mp4" type="video/mp4" />
+          </video>
+          <div className="skill-stage-overlay" />
+          <button
+            type="button"
+            className="skill-sound-toggle"
+            aria-label={skillActionSoundEnabled ? "Turn fox afterimage sound off" : "Turn fox afterimage sound on"}
+            aria-pressed={skillActionSoundEnabled}
+            onClick={toggleSkillActionSound}
+            disabled={!skillActionActive}
+          >
+            {skillActionSoundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            <span>{skillActionSoundEnabled ? "Action Sound On" : "Action Sound Off"}</span>
+          </button>
+
+          <motion.div
+            className="skill-content section-wrap"
+            animate={skillActionActive ? { opacity: 0, x: -90, filter: "blur(12px)" } : { opacity: 1, x: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <SectionHeader
+              eyebrow="Combat Skill Loadout"
+              title="Cast the awakened node. Upgrade the sealed techniques."
+              copy="The active skill behaves like a playable combat slot, while locked skills read as upgrade targets."
+            />
+            <div className="skill-hud-strip">
+              <div>
+                <span>SKILL POINTS</span>
+                <strong>01</strong>
+              </div>
+              <div>
+                <span>ACTIVE SLOT</span>
+                <strong>FOX AFTERIMAGE</strong>
+              </div>
+              <div>
+                <span>INPUT</span>
+                <strong>CLICK TO CAST</strong>
+              </div>
+            </div>
+            <div className="skill-loadout">
+              <motion.article
+                className="skill-card fox-skill-card skill-node-active group"
+                initial={{ opacity: 0, x: -30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ duration: 0.7 }}
+              >
+                <button
+                  type="button"
+                  className="fox-skill-button"
+                  onClick={startSkillAction}
+                  aria-label="Cast fox afterimage skill"
                 >
-                  <div className="grid h-14 w-14 place-items-center border border-violet-300/20 bg-violet-400/[0.08] text-violet-200">
-                    <Icon size={24} />
+                  <div className="skill-cast-orb">
+                    <span className="skill-cast-ring" />
+                    <span className="skill-cast-ring delayed" />
+                    <Sparkles size={28} />
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 text-left">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h3>{skill.name}</h3>
-                      <span className="danger-badge">Danger {skill.danger}</span>
+                      <span className="skill-state ready">
+                        <Zap size={13} />
+                        Ready
+                      </span>
+                      <span className="danger-badge">S+ Active</span>
                     </div>
-                    <p>{skill.copy}</p>
+                    <div className="mt-2 flex flex-wrap items-end gap-3">
+                      <h3>여우 잔영</h3>
+                      <span className="skill-kanji">狐残影</span>
+                    </div>
+                    <p>Fox afterimage protocol. Click to execute the sealed action sequence with combat audio.</p>
+                    <div className="skill-cast-cta">
+                      <Play size={15} />
+                      <span>PRESS TO CAST</span>
+                    </div>
                   </div>
-                  <Eye className="hidden text-violet-300/50 transition group-hover:text-pink-300 md:block" size={28} />
-                </motion.article>
-              );
-            })}
-          </div>
+                  <Flame className="skill-cast-flame" size={34} />
+                </button>
+              </motion.article>
+
+              {skills.map((skill, index) => {
+                const Icon = skill.icon;
+                return (
+                  <motion.article
+                    key={skill.name}
+                    className="skill-card locked-skill-card group"
+                    initial={{ opacity: 0, x: index % 2 ? 30 : -30 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-80px" }}
+                    transition={{ duration: 0.7, delay: index * 0.06 }}
+                    aria-disabled="true"
+                  >
+                    <div className="locked-skill-icon">
+                      <Icon size={24} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3>{skill.name}</h3>
+                        <span className="skill-state locked">
+                          <LockKeyhole size={13} />
+                          LV.{String(index + 2).padStart(2, "0")} REQUIRED
+                        </span>
+                        <span className="danger-badge">Danger {skill.danger}</span>
+                      </div>
+                      <p>{skill.copy}</p>
+                      <div className="skill-upgrade-line">
+                        <span>LEVEL UP REQUIRED</span>
+                        <i />
+                      </div>
+                    </div>
+                    <LockKeyhole className="locked-skill-mark" size={28} />
+                  </motion.article>
+                );
+              })}
+            </div>
+          </motion.div>
         </section>
 
         <section className="section-wrap">
           <SectionHeader
             eyebrow="Equipment"
             title="Hard tools for silent work."
-            copy="Tactical items are presented as rotating artifact cards with a restrained 3D tilt."
+            copy="Tactical items are presented as glowing artifact cards with restrained motion."
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {equipment.map((item, index) => {
@@ -926,23 +1279,185 @@ export default function Home() {
           </motion.div>
         </section>
 
-        <footer id="contact" className="border-t border-white/10 bg-[#070812] px-5 py-12">
-          <div className="mx-auto flex w-[min(1180px,100%)] flex-col gap-8 md:flex-row md:items-center md:justify-between">
+        <footer id="contact" className="site-footer border-t border-white/10 bg-[#070812] px-5 py-12">
+          <div className="mx-auto grid w-[min(1180px,100%)] gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
             <div>
               <p className="font-serif text-3xl text-white">ACCESS COMPLETE.</p>
-              <p className="mt-2 text-sm text-zinc-400">Ayame Uchiha dossier unlocked for cinematic preview.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-zinc-400">
+                {companyInfo.name}({companyInfo.englishName})가 제작한 인터랙티브 시네마틱 랜딩페이지
+                쇼케이스입니다. 홈페이지, 랜딩페이지, AI/웹앱 제작문의는 아래 버튼으로 바로 전달됩니다.
+              </p>
+              <div className="mt-6 grid gap-3 text-sm text-zinc-300 sm:grid-cols-2">
+                <div className="footer-info">
+                  <Building2 size={16} />
+                  <span>{companyInfo.name} · {companyInfo.englishName}</span>
+                </div>
+                <div className="footer-info">
+                  <Activity size={16} />
+                  <span>대표 {companyInfo.ceo} · 설립 {companyInfo.founded}</span>
+                </div>
+                <div className="footer-info">
+                  <Database size={16} />
+                  <span>사업자등록번호 {companyInfo.businessNumber}</span>
+                </div>
+                <div className="footer-info">
+                  <Crosshair size={16} />
+                  <span>DUNS {companyInfo.duns}</span>
+                </div>
+                <div className="footer-info sm:col-span-2">
+                  <MapPin size={16} />
+                  <span>{companyInfo.address}</span>
+                </div>
+                <div className="footer-info">
+                  <Phone size={16} />
+                  <span>{companyInfo.phone}</span>
+                </div>
+                <div className="footer-info">
+                  <Mail size={16} />
+                  <span>{companyInfo.email}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {[...socialLinks, { icon: Activity, label: "Contact" }].map(({ icon: Icon, label }) => (
-                <a key={label} href="#" className="social-link">
-                  <Icon size={16} />
-                  <span>{label}</span>
+            <div className="flex flex-col gap-4 lg:items-end">
+              <div className="flex flex-wrap gap-3 lg:justify-end">
+                {[...socialLinks, { icon: Activity, label: "Contact" }].map(({ icon: Icon, label }) => (
+                  <a key={label} href={label === "Contact" ? `mailto:${companyInfo.email}` : "#"} className="social-link">
+                    <Icon size={16} />
+                    <span>{label}</span>
+                  </a>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 lg:justify-end">
+                <a
+                  href={companyInfo.homepage}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="footer-cta secondary"
+                >
+                  <ExternalLink size={16} />
+                  <span>LUDGI 공식 정보</span>
                 </a>
-              ))}
+                <button type="button" className="footer-cta" onClick={openInquiry}>
+                  <Mail size={16} />
+                  <span>홈페이지 제작문의</span>
+                </button>
+              </div>
             </div>
           </div>
         </footer>
       </main>
+
+      <div className="inquiry-dock">
+        <AnimatePresence>
+          {inquiryOpen ? (
+            <motion.aside
+              className="inquiry-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-label="홈페이지 제작문의"
+              initial={{ opacity: 0, y: 22, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="eyebrow">LUDGI PROJECT REQUEST</p>
+                  <h2 className="mt-2 font-serif text-2xl text-white">홈페이지 제작문의</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-400">
+                    darima.xyz에서 온 문의로 표시되어 바로 구분됩니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="inquiry-close"
+                  onClick={closeInquiry}
+                  aria-label="Close inquiry form"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <form className="mt-5 grid gap-3" onSubmit={submitInquiry}>
+                <input
+                  className="hidden"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  name="website"
+                  value={inquiryForm.website}
+                  onChange={updateInquiry}
+                />
+                <label className="inquiry-field">
+                  <span>이름 / 담당자 *</span>
+                  <input
+                    name="name"
+                    value={inquiryForm.name}
+                    onChange={updateInquiry}
+                    placeholder="홍길동"
+                    required
+                  />
+                </label>
+                <label className="inquiry-field">
+                  <span>회사명</span>
+                  <input
+                    name="company"
+                    value={inquiryForm.company}
+                    onChange={updateInquiry}
+                    placeholder="주식회사 럿지"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="inquiry-field">
+                    <span>이메일 *</span>
+                    <input
+                      name="email"
+                      type="email"
+                      value={inquiryForm.email}
+                      onChange={updateInquiry}
+                      placeholder="name@example.com"
+                      required
+                    />
+                  </label>
+                  <label className="inquiry-field">
+                    <span>연락처</span>
+                    <input
+                      name="phone"
+                      value={inquiryForm.phone}
+                      onChange={updateInquiry}
+                      placeholder="010-0000-0000"
+                    />
+                  </label>
+                </div>
+                <label className="inquiry-field">
+                  <span>프로젝트 개요 *</span>
+                  <textarea
+                    name="message"
+                    value={inquiryForm.message}
+                    onChange={updateInquiry}
+                    placeholder="원하는 홈페이지/랜딩페이지 분위기, 예산, 일정 등을 알려주세요."
+                    rows={5}
+                    minLength={10}
+                    required
+                  />
+                </label>
+                <button type="submit" className="inquiry-submit" disabled={inquiryStatus === "sending"}>
+                  {inquiryStatus === "sending" ? <LoaderCircle className="animate-spin" size={18} /> : <Send size={18} />}
+                  <span>{inquiryStatus === "sending" ? "전송 중..." : "milli@molluhub.com 으로 문의 보내기"}</span>
+                </button>
+                {inquiryNotice ? (
+                  <p className={`inquiry-notice ${inquiryStatus}`}>
+                    {inquiryStatus === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                    <span>{inquiryNotice}</span>
+                  </p>
+                ) : null}
+              </form>
+            </motion.aside>
+          ) : null}
+        </AnimatePresence>
+        <button type="button" className="inquiry-fab" onClick={openInquiry} aria-label="홈페이지 제작문의 열기">
+          <Mail size={19} />
+          <span>제작문의</span>
+        </button>
+      </div>
 
       <AnimatePresence>
         {selectedImage ? (
