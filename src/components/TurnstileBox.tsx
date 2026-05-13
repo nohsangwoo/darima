@@ -24,6 +24,7 @@ declare global {
 
 type TurnstileBoxProps = {
   className?: string;
+  deferUntilVisible?: boolean;
   onEnabledChange?: (enabled: boolean) => void;
   onTokenChange: (token: string) => void;
   resetKey?: number;
@@ -31,13 +32,16 @@ type TurnstileBoxProps = {
 
 export default function TurnstileBox({
   className,
+  deferUntilVisible = false,
   onEnabledChange,
   onTokenChange,
   resetKey = 0,
 }: TurnstileBoxProps) {
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [isVisible, setIsVisible] = useState(!deferUntilVisible);
   const [scriptReady, setScriptReady] = useState(false);
   const [siteKey, setSiteKey] = useState("");
+  const shellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const onEnabledChangeRef = useRef(onEnabledChange);
   const onTokenChangeRef = useRef(onTokenChange);
@@ -49,12 +53,43 @@ export default function TurnstileBox({
   }, [onEnabledChange, onTokenChange]);
 
   useEffect(() => {
+    if (!deferUntilVisible || isVisible) {
+      return;
+    }
+
+    const shell = shellRef.current;
+
+    if (!shell || !("IntersectionObserver" in window)) {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "220px" },
+    );
+
+    observer.observe(shell);
+
+    return () => observer.disconnect();
+  }, [deferUntilVisible, isVisible]);
+
+  useEffect(() => {
     if (window.turnstile) {
       window.setTimeout(() => setScriptReady(true), 0);
     }
   }, []);
 
   useEffect(() => {
+    if (!isVisible) {
+      return;
+    }
+
     let cancelled = false;
 
     fetch("/api/turnstile/site-key", { cache: "no-store" })
@@ -81,7 +116,7 @@ export default function TurnstileBox({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isVisible]);
 
   useEffect(() => {
     onTokenChangeRef.current("");
@@ -99,7 +134,7 @@ export default function TurnstileBox({
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
       sitekey: siteKey,
       theme: "dark",
-      size: "flexible",
+      size: "normal",
       callback: (token) => onTokenChangeRef.current(token),
       "expired-callback": () => onTokenChangeRef.current(""),
       "error-callback": () => onTokenChangeRef.current(""),
@@ -114,16 +149,25 @@ export default function TurnstileBox({
   }, [scriptReady, siteKey]);
 
   if (!configLoaded) {
-    return <p className={className}>보안 인증 설정을 확인하는 중입니다.</p>;
+    return (
+      <div ref={shellRef} className={className}>
+        <p>보안 인증 설정을 확인하는 중입니다.</p>
+      </div>
+    );
   }
 
   if (!siteKey) {
-    return <p className={className}>Turnstile site key가 설정되지 않았습니다.</p>;
+    return (
+      <div ref={shellRef} className={className}>
+        <p>Turnstile site key가 설정되지 않았습니다.</p>
+      </div>
+    );
   }
 
   return (
-    <div className={className}>
+    <div ref={shellRef} className={className}>
       <Script
+        id="cloudflare-turnstile-api"
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}

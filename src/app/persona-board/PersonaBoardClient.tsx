@@ -146,6 +146,7 @@ export default function PersonaBoardClient() {
           </label>
           <TurnstileBox
             className="mt-4 border border-white/10 bg-black/30 p-3 text-sm text-zinc-400"
+            deferUntilVisible
             onEnabledChange={setTurnstileEnabled}
             onTokenChange={setTurnstileToken}
             resetKey={turnstileResetKey}

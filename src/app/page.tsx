@@ -847,6 +847,7 @@ function PersonaQASection() {
             </div>
             <TurnstileBox
               className="persona-turnstile-shell"
+              deferUntilVisible
               onEnabledChange={setTurnstileEnabled}
               onTokenChange={setTurnstileToken}
               resetKey={turnstileResetKey}
@@ -973,6 +974,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!inquiryOpen || turnstileConfigLoaded) {
+      return;
+    }
+
     let cancelled = false;
 
     fetch("/api/turnstile/site-key", { cache: "no-store" })
@@ -998,7 +1003,13 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [inquiryOpen, turnstileConfigLoaded]);
+
+  useEffect(() => {
+    if (inquiryOpen && window.turnstile) {
+      window.setTimeout(() => setTurnstileReady(true), 0);
+    }
+  }, [inquiryOpen]);
 
   useEffect(() => {
     if (!inquiryOpen) {
@@ -1022,7 +1033,7 @@ export default function Home() {
     turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
       sitekey: turnstileSiteKey,
       theme: "dark",
-      size: "flexible",
+      size: "normal",
       callback: (token) => {
         setTurnstileToken(token);
         if (inquiryStatus === "error") {
@@ -1181,6 +1192,12 @@ export default function Home() {
   const submitInquiry = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (!turnstileConfigLoaded) {
+      setInquiryStatus("error");
+      setInquiryNotice("보안 인증 설정을 확인하는 중입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
     if (turnstileSiteKey && !turnstileToken) {
       setInquiryStatus("error");
       setInquiryNotice("문의 발송 전에 보안 인증을 완료해주세요.");
@@ -1226,8 +1243,9 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      {turnstileSiteKey ? (
+      {inquiryOpen && turnstileSiteKey ? (
         <Script
+          id="cloudflare-turnstile-api"
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
           strategy="afterInteractive"
           onLoad={() => setTurnstileReady(true)}
@@ -1833,7 +1851,11 @@ export default function Home() {
                 <button
                   type="submit"
                   className="inquiry-submit"
-                  disabled={inquiryStatus === "sending" || Boolean(turnstileSiteKey && !turnstileToken)}
+                  disabled={
+                    inquiryStatus === "sending" ||
+                    !turnstileConfigLoaded ||
+                    Boolean(turnstileSiteKey && !turnstileToken)
+                  }
                 >
                   {inquiryStatus === "sending" ? <LoaderCircle className="animate-spin" size={18} /> : <Send size={18} />}
                   <span>{inquiryStatus === "sending" ? "전송 중..." : "milli@molluhub.com 으로 문의 보내기"}</span>
