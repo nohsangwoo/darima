@@ -1,8 +1,10 @@
 # DARIMA // AYAME UCHIHA CLAN
 
-> 다크 시네마틱 랜딩페이지, 게임 캐릭터 데이터베이스, AI 페르소나 질답, 홈페이지 제작문의 전환 흐름을 하나로 합친 인터랙티브 쇼케이스입니다.
+> 시네마틱 인터랙티브 브랜드 경험형 랜딩페이지, 게임 캐릭터 데이터베이스, AI 페르소나 질답, 홈페이지 제작문의 전환 흐름을 하나로 합친 프리미엄 모션 홈페이지 쇼케이스입니다.
 
-`DARIMA // AYAME UCHIHA CLAN`은 단순한 캐릭터 소개 페이지가 아니라, 방문자가 S급 시노비 기밀 데이터베이스를 열람하는 듯한 경험을 주는 Next.js 기반 랜딩페이지입니다. 이 프로젝트의 목적은 “홈페이지 제작 역량”을 말로 설명하는 대신, 실제 결과물 자체가 포트폴리오이자 영업 자료가 되도록 만드는 것입니다.
+`DARIMA // AYAME UCHIHA CLAN`은 일반형 회사 홈페이지가 아니라, 방문자가 S급 시노비 기밀 데이터베이스를 열람하는 듯한 경험을 주는 Next.js 기반 프리미엄 모션 랜딩페이지입니다. 이 프로젝트의 목적은 “홈페이지 제작 역량”을 말로 설명하는 대신, 실제 결과물 자체가 포트폴리오이자 영업 자료가 되도록 만드는 것입니다.
+
+굳이 한 단어로 정의하면, 이 프로젝트는 `시네마틱 인터랙티브 랜딩페이지` 혹은 `고급 모션 홈페이지`에 가깝습니다. 영상, 사운드, AI 응답, 보안 문의 폼, SEO 구조가 하나의 브랜드 경험으로 묶여 있어 단순 소개 페이지보다 “한번 체험해보고 기억하게 만드는” 쪽에 초점을 둡니다.
 
 이 README는 프로젝트 소개서이면서 사업 제안서에 가깝게 구성되어 있습니다. UX/UI 컨셉, 비즈니스 목적, 핵심 기능, AI 봇 구조, 문의 전환 설계, 보안, SEO, 배포 운영까지 한 번에 파악할 수 있도록 정리했습니다.
 
@@ -32,7 +34,7 @@
 
 ## Executive Summary
 
-대부분의 홈페이지는 서비스를 설명합니다. 이 프로젝트는 서비스를 증명합니다.
+대부분의 홈페이지는 서비스를 설명합니다. DARIMA는 “어떤 수준의 홈페이지와 랜딩페이지를 만들 수 있는지”를 체험으로 증명합니다.
 
 DARIMA는 럿지, 주식회사 럿지, LUDGI Inc.가 만들 수 있는 홈페이지와 랜딩페이지의 방향성을 한 화면 안에서 보여주는 쇼케이스입니다. 방문자는 페이지를 스크롤하면서 다음 역량을 자연스럽게 확인합니다.
 
@@ -42,7 +44,8 @@ DARIMA는 럿지, 주식회사 럿지, LUDGI Inc.가 만들 수 있는 홈페이
 - 모바일 전용 영상 대응
 - AI 페르소나 기반 질답 경험
 - Cloudflare Turnstile을 통한 문의 보안
-- AWS SES 또는 SMTP 기반 문의 메일 발송
+- Cloudflare Turnstile과 Upstash Redis 기반 요청 방어
+- SMTP 발송 실패 시 AWS SES API fallback이 붙은 문의 메일 발송
 - SEO, sitemap, RSS, robots, Open Graph 대응
 - Vercel 배포에 적합한 Next.js App Router 구조
 
@@ -73,7 +76,7 @@ DARIMA는 다음 고객군을 설득하기 위한 데모로 사용할 수 있습
 
 | 영역 | 메시지 |
 | --- | --- |
-| Homepage Production | 회사 소개용 페이지를 넘어 실제 문의 전환까지 고려한 제작 |
+| Premium Motion Homepage | 일반 기업 소개 페이지가 아니라 영상, 사운드, 모션, AI 응답이 결합된 브랜드 경험형 홈페이지 |
 | Landing Page | 짧은 시간 안에 브랜드 인상을 각인시키는 시네마틱 구성 |
 | AI Experience | 정적인 FAQ가 아니라 페르소나가 있는 상호작용형 질답 |
 | Digital Art UX/UI | 이미지, 영상, 글로우, 패럴랙스, 모션을 결합한 몰입형 디자인 |
@@ -86,7 +89,7 @@ DARIMA는 다음 고객군을 설득하기 위한 데모로 사용할 수 있습
 
 > 사용자가 한 명의 위험한 S급 시노비 데이터를 열람하는 느낌.
 
-이 페이지는 일반적인 기업 랜딩페이지처럼 서비스 장점만 나열하지 않습니다. 사용자는 스크롤을 내리며 캐릭터의 프로필, 스킬, 장비, 관계, 기록, 철학, 갤러리, AI 응답을 순서대로 발견합니다.
+이 페이지는 일반형 기업 랜딩페이지처럼 서비스 장점만 나열하지 않습니다. 사용자는 스크롤을 내리며 캐릭터의 프로필, 스킬, 장비, 관계, 기록, 철학, 갤러리, AI 응답을 순서대로 발견합니다.
 
 ### 감정 키워드
 
@@ -243,8 +246,7 @@ or your nightmare.
 - 문의자 이름
 - 회사명
 - 이메일
-- 예산
-- 일정
+- 전화번호
 - 문의 내용
 - 출처: `https://www.darima.xyz/`
 - Turnstile 검증 여부
@@ -270,13 +272,31 @@ TURNSTILE_SECRET_KEY=
 4. `/api/inquiry`가 `TURNSTILE_SECRET_KEY`로 Cloudflare 검증을 수행합니다.
 5. 검증 실패 시 메일을 전송하지 않습니다.
 
+Turnstile 위젯은 Cloudflare iframe 내부에서 동작하므로 브라우저 콘솔에 Private Access Token, Trusted Types, preload 관련 진단 로그가 보일 수 있습니다. 실제 문의 실패 여부는 `/api/inquiry` 응답 상태와 서버 로그를 기준으로 판단합니다.
+
+### Upstash Redis 요청 방어
+
+Turnstile만으로는 짧은 시간에 같은 사용자가 API를 반복 호출하는 상황을 모두 막기 어렵기 때문에, 백엔드에는 Upstash Redis 기반 요청 방어가 함께 들어가 있습니다.
+
+- `/api/inquiry`: 동일 사용자 기준 5분 cooldown, 전송 중 30초 in-flight lock
+- `/api/persona-bot`: 동일 사용자 기준 2분 cooldown, 생성 중 in-flight lock
+- 식별 기준: IP, user-agent, 입력 이메일 또는 클라이언트 식별자를 조합한 서버 측 identity
+- 저장소 장애 시 무제한 허용하지 않고 보수적으로 503 또는 429 응답
+
+필요 환경 변수:
+
+```bash
+KV_REST_API_URL=
+KV_REST_API_TOKEN=
+```
+
 ### 환경 변수 보호
 
 이 레포지토리는 public 레포로 운영될 수 있으므로 `.env` 파일은 Git에 올라가지 않도록 관리해야 합니다. `.gitignore`에서 `.env*` 패턴을 통해 민감 정보 커밋을 방지합니다.
 
 ## 이메일 발송 구조
 
-문의 메일은 AWS SES 또는 SMTP/nodemailer 환경을 사용할 수 있도록 구성되어 있습니다.
+문의 메일은 SMTP/nodemailer를 먼저 시도하고, SMTP 인증 실패나 미설정 상태에서는 AWS SES API로 fallback되도록 구성되어 있습니다. 운영 중 `535 Authentication Credentials Invalid` 같은 SMTP 오류가 발생해도 SES API 자격 증명이 정상이라면 문의 발송이 이어집니다.
 
 필요 환경 변수:
 
@@ -401,8 +421,8 @@ Footer와 구조화 데이터에는 LUDGI 공식 정보 페이지를 기반으�
 | Motion | Framer Motion, Lenis Scroll |
 | Icons | Lucide Icons |
 | AI | Vercel AI SDK, OpenAI |
-| Email | AWS SES, nodemailer fallback |
-| Security | Cloudflare Turnstile |
+| Email | SMTP/nodemailer primary, AWS SES API fallback |
+| Security | Cloudflare Turnstile, Upstash Redis request guard |
 | Deploy | Vercel |
 | SEO | Next Metadata API, robots, sitemap, RSS |
 
@@ -412,7 +432,7 @@ Footer와 구조화 데이터에는 LUDGI 공식 정보 페이지를 기반으�
 src/app/layout.tsx                         SEO metadata, Open Graph, canonical
 src/app/page.tsx                           메인 랜딩페이지 전체 UI
 src/app/globals.css                        시네마틱 디자인 시스템과 반응형 스타일
-src/app/api/inquiry/route.ts               Turnstile 검증 후 문의 메일 발송
+src/app/api/inquiry/route.ts               Turnstile 검증, Redis 요청 방어, SMTP/SES fallback 문의 발송
 src/app/api/persona-bot/route.ts           AI 페르소나 질답 API
 src/app/api/turnstile/site-key/route.ts    공개 Turnstile site key 제공
 src/app/sitemap.ts                         sitemap.xml 생성
@@ -464,7 +484,8 @@ npm run build
 - `OPENAI_API_KEY` 설정
 - `TURNSTILE_SITE_KEY` 설정
 - `TURNSTILE_SECRET_KEY` 설정
-- AWS SES 또는 SMTP 관련 환경 변수 설정
+- `KV_REST_API_URL`, `KV_REST_API_TOKEN` 설정
+- SMTP 및 AWS SES API 관련 환경 변수 설정
 - `https://www.darima.xyz/sitemap.xml` 접근 확인
 - `https://www.darima.xyz/rss.xml` 접근 확인
 - Google Search Console에 sitemap 제출

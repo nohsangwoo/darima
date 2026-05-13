@@ -31,6 +31,14 @@ type TurnstileResponse = {
   challenge_ts?: string;
 };
 
+type MailInput = {
+  sender: string;
+  replyTo: string;
+  subject: string;
+  textBody: string;
+  htmlBody: string;
+};
+
 function env(name: string) {
   return process.env[name]?.trim();
 }
@@ -144,13 +152,7 @@ function getSmtpConfig() {
   };
 }
 
-async function sendWithSmtp(input: {
-  sender: string;
-  replyTo: string;
-  subject: string;
-  textBody: string;
-  htmlBody: string;
-}) {
+async function sendWithSmtp(input: MailInput) {
   const smtpConfig = getSmtpConfig();
 
   if (!smtpConfig) {
@@ -158,16 +160,50 @@ async function sendWithSmtp(input: {
   }
 
   const transporter = nodemailer.createTransport(smtpConfig);
-  await transporter.sendMail({
-    from: input.sender,
-    to: recipient,
-    replyTo: input.replyTo,
-    subject: input.subject,
-    text: input.textBody,
-    html: input.htmlBody,
-  });
+
+  try {
+    await transporter.sendMail({
+      from: input.sender,
+      to: recipient,
+      replyTo: input.replyTo,
+      subject: input.subject,
+      text: input.textBody,
+      html: input.htmlBody,
+    });
+  } catch (error) {
+    console.warn("SMTP inquiry send failed; falling back to AWS SES API.", error);
+    return false;
+  }
 
   return true;
+}
+
+async function sendWithSesApi(input: MailInput) {
+  await getSesClient().send(
+    new SendEmailCommand({
+      Source: input.sender,
+      Destination: {
+        ToAddresses: [recipient],
+      },
+      ReplyToAddresses: [input.replyTo],
+      Message: {
+        Subject: {
+          Charset: "UTF-8",
+          Data: input.subject,
+        },
+        Body: {
+          Text: {
+            Charset: "UTF-8",
+            Data: input.textBody,
+          },
+          Html: {
+            Charset: "UTF-8",
+            Data: input.htmlBody,
+          },
+        },
+      },
+    }),
+  );
 }
 
 export async function POST(request: Request) {
@@ -286,43 +322,18 @@ export async function POST(request: Request) {
 </html>`;
 
   try {
-    const sentWithSmtp = await sendWithSmtp({
+    const mailInput = {
       sender,
       replyTo: email,
       subject,
       textBody,
       htmlBody,
-    });
+    };
+    const sentWithSmtp = await sendWithSmtp(mailInput);
 
-    if (sentWithSmtp) {
-      return NextResponse.json({ ok: true });
+    if (!sentWithSmtp) {
+      await sendWithSesApi(mailInput);
     }
-
-    await getSesClient().send(
-      new SendEmailCommand({
-        Source: sender,
-        Destination: {
-          ToAddresses: [recipient],
-        },
-        ReplyToAddresses: [email],
-        Message: {
-          Subject: {
-            Charset: "UTF-8",
-            Data: subject,
-          },
-          Body: {
-            Text: {
-              Charset: "UTF-8",
-              Data: textBody,
-            },
-            Html: {
-              Charset: "UTF-8",
-              Data: htmlBody,
-            },
-          },
-        },
-      }),
-    );
 
     return NextResponse.json({ ok: true });
   } catch (error) {
