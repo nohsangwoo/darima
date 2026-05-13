@@ -1,6 +1,12 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import {
+  buildRequestIdentity,
+  getClientIp,
+  releaseRequestSlot,
+  reserveRequestSlot,
+} from "@/lib/server/request-guard";
 
 export const runtime = "nodejs";
 
@@ -40,15 +46,6 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
-
-function getClientIp(request: Request) {
-  return (
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-real-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    undefined
-  );
 }
 
 async function verifyTurnstileToken(token: string, request: Request) {
@@ -214,6 +211,31 @@ export async function POST(request: Request) {
     );
   }
 
+  const identity = buildRequestIdentity(request, [email.toLowerCase()]);
+  const reservation = await reserveRequestSlot({
+    namespace: "inquiry",
+    identity,
+    cooldownSeconds: 300,
+    inFlightSeconds: 30,
+  });
+
+  if (!reservation.ok) {
+    const message =
+      reservation.reason === "storage-error"
+        ? "요청 방어 장치를 확인하는 중입니다. 잠시 후 다시 시도해 주세요."
+        : "문의는 잠시 후 다시 보낼 수 있습니다. 이미 접수 중인 요청이 있는지 확인해 주세요.";
+
+    return NextResponse.json(
+      { ok: false, message, retryAfter: reservation.retryAfter },
+      {
+        status: reservation.reason === "storage-error" ? 503 : 429,
+        headers: {
+          "Retry-After": String(reservation.retryAfter),
+        },
+      },
+    );
+  }
+
   const safeName = escapeHtml(name);
   const safeEmail = escapeHtml(email);
   const safePhone = escapeHtml(phone || "Not provided");
@@ -309,5 +331,7 @@ export async function POST(request: Request) {
       { ok: false, message: "문의 발송에 실패했습니다. 잠시 후 다시 시도해주세요." },
       { status: 500 },
     );
+  } finally {
+    await releaseRequestSlot("inquiry", identity);
   }
 }

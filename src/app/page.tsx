@@ -44,6 +44,9 @@ import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Script from "next/script";
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import TurnstileBox from "@/components/TurnstileBox";
+import { usePersonaBoard } from "@/lib/persona-board-store";
+import { companyInfo, siteUrl } from "@/lib/site";
 
 type TurnstileRenderOptions = {
   sitekey: string;
@@ -73,28 +76,16 @@ const navItems = [
   ["Contacts", "contact"],
 ] as const;
 
+const pageNavItems = [
+  ["Company", "/company"],
+  ["Q&A Board", "/persona-board"],
+] as const;
+
 const socialLinks: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Send, label: "Discord" },
   { icon: Camera, label: "Instagram" },
   { icon: Music2, label: "TikTok" },
 ];
-
-const siteUrl = "https://www.darima.xyz";
-
-const companyInfo = {
-  name: "주식회사 럿지",
-  englishName: "LUDGI Inc.",
-  ceo: "노상우",
-  founded: "2024",
-  businessNumber: "307-88-03283",
-  duns: "963415644",
-  address: "인천광역시 연수구 인천타워대로 323, 에이동 20층",
-  phone: "010-3006-9310",
-  email: "milli@molluhub.com",
-  homepage: "https://info.ludgi.ai/",
-  summary:
-    "공공기관 SI 수주와 30여 개 이상의 민간 프로젝트를 수행한 소프트웨어 개발 전문 기업입니다.",
-};
 
 const inquiryInitialState = {
   name: "",
@@ -109,30 +100,7 @@ type InquiryForm = typeof inquiryInitialState;
 type InquiryStatus = "idle" | "sending" | "success" | "error";
 type PersonaBotStatus = "idle" | "question" | "answer";
 
-type PersonaBoardEntry = {
-  id: string;
-  question: string;
-  answer: string;
-  model: string;
-};
-
-const personaModelName = "gpt-5.4-mini-2026-03-17";
 const personaPageSize = 3;
-
-const initialPersonaBoard: PersonaBoardEntry[] = [
-  {
-    id: "seed-rain",
-    question: "비 오는 밤에는 무슨 생각을 해?",
-    answer: "소리가 줄어들어.\n도시는 젖고, 사람들은 서두르지.\n그때가 제일 보기 좋아.",
-    model: personaModelName,
-  },
-  {
-    id: "seed-kind",
-    question: "너는 다정한 편이야?",
-    answer: "다정함은 시끄러워.\n나는 필요한 만큼만 움직여.\n그게 더 오래 남아.",
-    model: personaModelName,
-  },
-];
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -551,6 +519,15 @@ function Navbar() {
               {label}
             </button>
           ))}
+          {pageNavItems.map(([label, href]) => (
+            <a
+              key={href}
+              href={href}
+              className="rounded-full px-4 py-2 text-xs uppercase tracking-[0.22em] text-violet-200 transition hover:bg-violet-500/15 hover:text-white"
+            >
+              {label}
+            </a>
+          ))}
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
@@ -594,6 +571,16 @@ function Navbar() {
               >
                 {label}
               </button>
+            ))}
+            {pageNavItems.map(([label, href]) => (
+              <a
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                className="px-3 py-3 text-left text-xs uppercase tracking-[0.26em] text-violet-200"
+              >
+                {label}
+              </a>
             ))}
           </motion.div>
         ) : null}
@@ -685,53 +672,72 @@ function RadarChart() {
 
 function PersonaQASection() {
   const [question, setQuestion] = useState("");
-  const [entries, setEntries] = useState<PersonaBoardEntry[]>(initialPersonaBoard);
   const [status, setStatus] = useState<PersonaBotStatus>("idle");
   const [notice, setNotice] = useState("");
-  const [page, setPage] = useState(0);
-  const pageCount = Math.max(1, Math.ceil(entries.length / personaPageSize));
-  const visibleEntries = entries.slice(page * personaPageSize, page * personaPageSize + personaPageSize);
+  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const { entries, page, pageCount, registerAnswer, setPage, visibleEntries } = usePersonaBoard(personaPageSize);
 
-  const registerAnswer = (nextQuestion: string, answer: string, model: string) => {
-    setEntries((current) => [
-      {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        question: nextQuestion,
-        answer,
-        model,
-      },
-      ...current,
-    ]);
-    setPage(0);
+  const cooldownRemaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
+  const waitingForTurnstile = turnstileEnabled && !turnstileToken;
+  const busy = status !== "idle";
+  const requestBlocked = busy || cooldownRemaining > 0 || waitingForTurnstile;
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldownUntil]);
+
+  const resetPersonaTurnstile = () => {
+    setTurnstileToken("");
+    setTurnstileResetKey((value) => value + 1);
   };
 
   const requestAnswer = async (nextQuestion: string) => {
     setStatus("answer");
     setNotice("");
 
-    const response = await fetch("/api/persona-bot", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        mode: "answer",
-        question: nextQuestion,
-      }),
-    });
-    const result = (await response.json().catch(() => null)) as {
-      answer?: string;
-      message?: string;
-      model?: string;
-      question?: string;
-    } | null;
+    try {
+      const response = await fetch("/api/persona-bot", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: "answer",
+          question: nextQuestion,
+          turnstileToken,
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        answer?: string;
+        cooldownSeconds?: number;
+        message?: string;
+        question?: string;
+        retryAfter?: number;
+      } | null;
 
-    if (!response.ok || !result?.answer) {
-      throw new Error(result?.message || "페르소나 응답 생성에 실패했습니다.");
+      if (!response.ok || !result?.answer) {
+        if (response.status === 429 && result?.retryAfter) {
+          setCooldownUntil(Date.now() + result.retryAfter * 1000);
+        }
+
+        throw new Error(result?.message || "페르소나 응답 생성에 실패했습니다.");
+      }
+
+      registerAnswer(result.question || nextQuestion, result.answer);
+      setCooldownUntil(Date.now() + (result.cooldownSeconds || 120) * 1000);
+      setQuestion("");
+    } finally {
+      if (turnstileEnabled) {
+        resetPersonaTurnstile();
+      }
     }
-
-    registerAnswer(result.question || nextQuestion, result.answer, result.model || personaModelName);
-    setQuestion("");
   };
 
   const askQuestion = async (event?: FormEvent<HTMLFormElement>) => {
@@ -754,7 +760,7 @@ function PersonaQASection() {
 
   const askRandomQuestion = async () => {
     try {
-      setStatus("question");
+      setStatus("answer");
       setNotice("");
 
       const response = await fetch("/api/persona-bot", {
@@ -763,28 +769,38 @@ function PersonaQASection() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          mode: "question",
+          mode: "auto",
+          turnstileToken,
         }),
       });
       const result = (await response.json().catch(() => null)) as {
+        answer?: string;
+        cooldownSeconds?: number;
         message?: string;
         question?: string;
+        retryAfter?: number;
       } | null;
 
-      if (!response.ok || !result?.question) {
-        throw new Error(result?.message || "랜덤 질문 생성에 실패했습니다.");
+      if (!response.ok || !result?.question || !result.answer) {
+        if (response.status === 429 && result?.retryAfter) {
+          setCooldownUntil(Date.now() + result.retryAfter * 1000);
+        }
+
+        throw new Error(result?.message || "랜덤 질답 생성에 실패했습니다.");
       }
 
-      setQuestion(result.question);
-      await requestAnswer(result.question);
+      registerAnswer(result.question, result.answer);
+      setCooldownUntil(Date.now() + (result.cooldownSeconds || 120) * 1000);
+      setQuestion("");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "랜덤 질답 생성에 실패했습니다.");
     } finally {
+      if (turnstileEnabled) {
+        resetPersonaTurnstile();
+      }
       setStatus("idle");
     }
   };
-
-  const busy = status !== "idle";
 
   return (
     <section id="persona-bot" className="persona-board-section section-wrap">
@@ -820,15 +836,26 @@ function PersonaQASection() {
               />
             </label>
             <div className="persona-actions">
-              <button type="button" onClick={askRandomQuestion} disabled={busy}>
-                {status === "question" ? <RefreshCw className="animate-spin" size={17} /> : <WandSparkles size={17} />}
-                <span>{status === "question" ? "주제 선택 중" : "랜덤 주제 던지기"}</span>
+              <button type="button" onClick={askRandomQuestion} disabled={requestBlocked}>
+                {status === "answer" ? <RefreshCw className="animate-spin" size={17} /> : <WandSparkles size={17} />}
+                <span>{status === "answer" ? "질답 생성 중" : "봇이 질문하고 답하기"}</span>
               </button>
-              <button type="submit" disabled={busy}>
+              <button type="submit" disabled={requestBlocked}>
                 {status === "answer" ? <RefreshCw className="animate-spin" size={17} /> : <Send size={17} />}
                 <span>{status === "answer" ? "응답 생성 중" : "질문 등록"}</span>
               </button>
             </div>
+            <TurnstileBox
+              className="persona-turnstile-shell"
+              onEnabledChange={setTurnstileEnabled}
+              onTokenChange={setTurnstileToken}
+              resetKey={turnstileResetKey}
+            />
+            {cooldownRemaining > 0 ? (
+              <p className="persona-notice">다음 질문까지 {cooldownRemaining}초 남았습니다.</p>
+            ) : waitingForTurnstile ? (
+              <p className="persona-notice">질문 등록 전에 보안 인증을 완료해 주세요.</p>
+            ) : null}
             {notice ? <p className="persona-notice">{notice}</p> : null}
           </form>
         </motion.div>
@@ -985,7 +1012,6 @@ export default function Home() {
 
     if (
       !turnstileSiteKey ||
-      !turnstileReady ||
       !turnstileContainerRef.current ||
       !window.turnstile ||
       turnstileWidgetIdRef.current

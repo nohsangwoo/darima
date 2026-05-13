@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
 import { Cinzel, Geist_Mono, Inter } from "next/font/google";
+import {
+  commonSeoDescription,
+  ogImage,
+  ogImageHeight,
+  ogImageWidth,
+  siteUrl,
+  targetKeywords,
+} from "@/lib/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -18,27 +26,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.darima.xyz"),
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "Darima | LUDGI Inc. Homepage Landing Page",
+    default: "Darima | 럿지 LUDGI Inc. 홈페이지제작 랜딩페이지",
     template: "%s | Darima",
   },
-  description:
-    "럿지, 주식회사 럿지, LUDGI Inc.가 선보이는 시네마틱 인터랙티브 랜딩페이지. 홈페이지 제작문의와 디지털 아트형 UX/UI를 한 번에 확인하세요.",
+  description: commonSeoDescription,
   applicationName: "Darima",
-  keywords: [
-    "럿지",
-    "주식회사 럿지",
-    "LUDGI",
-    "LUDGI Inc.",
-    "LUDGI Inc. homepage",
-    "landingpage",
-    "홈페이지 제작문의",
-    "랜딩페이지 제작",
-    "Next.js landing page",
-    "interactive cinematic website",
-    "anime cinematic landing page",
-  ],
+  keywords: targetKeywords,
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+  },
   alternates: {
     canonical: "/",
     types: {
@@ -48,26 +51,24 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ko_KR",
-    url: "https://www.darima.xyz/",
+    url: `${siteUrl}/`,
     siteName: "Darima by LUDGI Inc.",
-    title: "Darima | LUDGI Inc. Homepage Landing Page",
-    description:
-      "주식회사 럿지(LUDGI Inc.)의 다크 시네마틱 랜딩페이지 쇼케이스와 홈페이지 제작문의.",
+    title: "Darima | 럿지 LUDGI Inc. 홈페이지제작 랜딩페이지",
+    description: commonSeoDescription,
     images: [
       {
-        url: "/assets/ayame-ui-concept.png",
-        width: 1536,
-        height: 1024,
+        url: ogImage,
+        width: ogImageWidth,
+        height: ogImageHeight,
         alt: "Darima cinematic anime shinobi landing page by LUDGI Inc.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Darima | LUDGI Inc. Homepage Landing Page",
-    description:
-      "럿지, 주식회사 럿지, LUDGI Inc.의 인터랙티브 홈페이지 및 랜딩페이지 제작문의.",
-    images: ["/assets/ayame-ui-concept.png"],
+    title: "Darima | 럿지 LUDGI Inc. 홈페이지제작 랜딩페이지",
+    description: commonSeoDescription,
+    images: [ogImage],
   },
   robots: {
     index: true,
