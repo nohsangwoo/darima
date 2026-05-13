@@ -296,7 +296,7 @@ KV_REST_API_TOKEN=
 
 ## 이메일 발송 구조
 
-문의 메일은 SMTP/nodemailer를 먼저 시도하고, SMTP 인증 실패나 미설정 상태에서는 AWS SES API로 fallback되도록 구성되어 있습니다. 운영 중 `535 Authentication Credentials Invalid` 같은 SMTP 오류가 발생해도 SES API 자격 증명이 정상이라면 문의 발송이 이어집니다.
+문의 메일은 SMTP 전용 환경 변수(`AWS_SES_SMTP_ACCESS`, `AWS_SES_SMTP_SECRET`)가 있을 때만 SMTP/nodemailer를 먼저 시도하고, 없으면 AWS SES API로 바로 발송합니다. SES API는 `AWS_SES_ACCESS`, `AWS_SES_SECRET`을 우선 사용하므로 S3 업로더 같은 전역 AWS 키와 권한이 섞이지 않도록 구성되어 있습니다.
 
 필요 환경 변수:
 
@@ -312,6 +312,8 @@ AWS_SES_ENDPOINT=
 AWS_SES_PORT=
 AWS_SES_REGION=
 AWS_SES_SECRET=
+AWS_SES_SMTP_ACCESS=
+AWS_SES_SMTP_SECRET=
 ```
 
 서버 API:
@@ -421,7 +423,7 @@ Footer와 구조화 데이터에는 LUDGI 공식 정보 페이지를 기반으�
 | Motion | Framer Motion, Lenis Scroll |
 | Icons | Lucide Icons |
 | AI | Vercel AI SDK, OpenAI |
-| Email | SMTP/nodemailer primary, AWS SES API fallback |
+| Email | AWS SES API primary, optional SMTP/nodemailer fallback path |
 | Security | Cloudflare Turnstile, Upstash Redis request guard |
 | Deploy | Vercel |
 | SEO | Next Metadata API, robots, sitemap, RSS |

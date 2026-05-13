@@ -107,8 +107,16 @@ function getApiEndpoint() {
 }
 
 function getSesClient() {
-  const accessKeyId = env("AWS_ACCESS_KEY_ID") || env("AWS_SES_ACCESS");
-  const secretAccessKey = env("AWS_SECRET_ACCESS_KEY") || env("AWS_SES_SECRET");
+  const accessKeyId =
+    env("AWS_SES_ACCESS") ||
+    env("AWS_SES_ACCESS_KEY_ID") ||
+    env("AWS_SES_API_ACCESS_KEY_ID") ||
+    env("AWS_ACCESS_KEY_ID");
+  const secretAccessKey =
+    env("AWS_SES_SECRET") ||
+    env("AWS_SES_SECRET_ACCESS_KEY") ||
+    env("AWS_SES_API_SECRET_ACCESS_KEY") ||
+    env("AWS_SECRET_ACCESS_KEY");
   const region = env("AWS_SES_REGION") || env("AWS_REGION") || "ap-northeast-2";
 
   if (!accessKeyId || !secretAccessKey) {
@@ -132,8 +140,8 @@ function getSesClient() {
 function getSmtpConfig() {
   const endpoint = env("AWS_SES_ENDPOINT");
   const port = Number(env("AWS_SES_PORT") || "587");
-  const user = env("AWS_SES_ACCESS");
-  const pass = env("AWS_SES_SECRET");
+  const user = env("AWS_SES_SMTP_ACCESS") || env("AWS_SES_SMTP_USERNAME");
+  const pass = env("AWS_SES_SMTP_SECRET") || env("AWS_SES_SMTP_PASSWORD");
 
   if (!endpoint || !user || !pass) {
     return null;
