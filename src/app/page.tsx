@@ -8,6 +8,8 @@ import {
   Building2,
   ChevronDown,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Crosshair,
   Database,
   Eye,
@@ -26,6 +28,7 @@ import {
   Phone,
   Play,
   Radio,
+  RefreshCw,
   ScrollText,
   Send,
   Shield,
@@ -33,16 +36,38 @@ import {
   Swords,
   Volume2,
   VolumeX,
+  WandSparkles,
   X,
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
+import Script from "next/script";
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+
+type TurnstileRenderOptions = {
+  sitekey: string;
+  theme?: "light" | "dark" | "auto";
+  size?: "normal" | "compact" | "flexible";
+  callback?: (token: string) => void;
+  "expired-callback"?: () => void;
+  "error-callback"?: () => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement | string, options: TurnstileRenderOptions) => string;
+      reset: (widgetId?: string) => void;
+      remove?: (widgetId: string) => void;
+    };
+  }
+}
 
 const navItems = [
   ["Home", "hero"],
   ["About", "overview"],
+  ["Bot", "persona-bot"],
   ["Skills", "skills"],
   ["Gallery", "gallery"],
   ["Contacts", "contact"],
@@ -82,6 +107,32 @@ const inquiryInitialState = {
 
 type InquiryForm = typeof inquiryInitialState;
 type InquiryStatus = "idle" | "sending" | "success" | "error";
+type PersonaBotStatus = "idle" | "question" | "answer";
+
+type PersonaBoardEntry = {
+  id: string;
+  question: string;
+  answer: string;
+  model: string;
+};
+
+const personaModelName = "gpt-5.4-mini-2026-03-17";
+const personaPageSize = 3;
+
+const initialPersonaBoard: PersonaBoardEntry[] = [
+  {
+    id: "seed-rain",
+    question: "비 오는 밤에는 무슨 생각을 해?",
+    answer: "소리가 줄어들어.\n도시는 젖고, 사람들은 서두르지.\n그때가 제일 보기 좋아.",
+    model: personaModelName,
+  },
+  {
+    id: "seed-kind",
+    question: "너는 다정한 편이야?",
+    answer: "다정함은 시끄러워.\n나는 필요한 만큼만 움직여.\n그게 더 오래 남아.",
+    model: personaModelName,
+  },
+];
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -632,6 +683,201 @@ function RadarChart() {
   );
 }
 
+function PersonaQASection() {
+  const [question, setQuestion] = useState("");
+  const [entries, setEntries] = useState<PersonaBoardEntry[]>(initialPersonaBoard);
+  const [status, setStatus] = useState<PersonaBotStatus>("idle");
+  const [notice, setNotice] = useState("");
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(entries.length / personaPageSize));
+  const visibleEntries = entries.slice(page * personaPageSize, page * personaPageSize + personaPageSize);
+
+  const registerAnswer = (nextQuestion: string, answer: string, model: string) => {
+    setEntries((current) => [
+      {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        question: nextQuestion,
+        answer,
+        model,
+      },
+      ...current,
+    ]);
+    setPage(0);
+  };
+
+  const requestAnswer = async (nextQuestion: string) => {
+    setStatus("answer");
+    setNotice("");
+
+    const response = await fetch("/api/persona-bot", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mode: "answer",
+        question: nextQuestion,
+      }),
+    });
+    const result = (await response.json().catch(() => null)) as {
+      answer?: string;
+      message?: string;
+      model?: string;
+      question?: string;
+    } | null;
+
+    if (!response.ok || !result?.answer) {
+      throw new Error(result?.message || "페르소나 응답 생성에 실패했습니다.");
+    }
+
+    registerAnswer(result.question || nextQuestion, result.answer, result.model || personaModelName);
+    setQuestion("");
+  };
+
+  const askQuestion = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    const nextQuestion = question.trim();
+
+    if (!nextQuestion) {
+      setNotice("질문을 입력하거나 랜덤 주제를 던져주세요.");
+      return;
+    }
+
+    try {
+      await requestAnswer(nextQuestion);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "응답 생성에 실패했습니다.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const askRandomQuestion = async () => {
+    try {
+      setStatus("question");
+      setNotice("");
+
+      const response = await fetch("/api/persona-bot", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: "question",
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        message?: string;
+        question?: string;
+      } | null;
+
+      if (!response.ok || !result?.question) {
+        throw new Error(result?.message || "랜덤 질문 생성에 실패했습니다.");
+      }
+
+      setQuestion(result.question);
+      await requestAnswer(result.question);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "랜덤 질답 생성에 실패했습니다.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const busy = status !== "idle";
+
+  return (
+    <section id="persona-bot" className="persona-board-section section-wrap">
+      <SectionHeader
+        eyebrow="Midnight Q&A Archive"
+        title="Ask the quiet one. She may answer."
+        copy="Throw a small question into the archive. Iris answers in her own silence."
+      />
+      <div className="persona-board-grid">
+        <motion.div
+          className="persona-console"
+          initial={{ opacity: 0, y: 28 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+        >
+          <div className="persona-console-head">
+            <div>
+              <span>ACTIVE DOSSIER</span>
+              <strong>IRIS VALE</strong>
+            </div>
+            <Eye size={28} />
+          </div>
+          <form className="persona-question-form" onSubmit={askQuestion}>
+            <label>
+              <span>QUESTION INPUT</span>
+              <textarea
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                placeholder="오늘 기분은 어때? / 싸우는 게 무섭지 않아? / 좋아하는 음악 있어?"
+                rows={5}
+                disabled={busy}
+              />
+            </label>
+            <div className="persona-actions">
+              <button type="button" onClick={askRandomQuestion} disabled={busy}>
+                {status === "question" ? <RefreshCw className="animate-spin" size={17} /> : <WandSparkles size={17} />}
+                <span>{status === "question" ? "주제 선택 중" : "랜덤 주제 던지기"}</span>
+              </button>
+              <button type="submit" disabled={busy}>
+                {status === "answer" ? <RefreshCw className="animate-spin" size={17} /> : <Send size={17} />}
+                <span>{status === "answer" ? "응답 생성 중" : "질문 등록"}</span>
+              </button>
+            </div>
+            {notice ? <p className="persona-notice">{notice}</p> : null}
+          </form>
+        </motion.div>
+
+        <div className="persona-answer-feed">
+          {visibleEntries.map((entry, index) => (
+            <motion.article
+              key={entry.id}
+              className="persona-answer-card"
+              initial={{ opacity: 0, y: 22 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.55, delay: Math.min(index * 0.05, 0.2) }}
+            >
+              <div className="persona-answer-meta">
+                <span>IRIS VALE</span>
+                <em>{String(entries.length - (page * personaPageSize + index)).padStart(2, "0")}</em>
+              </div>
+              <h3>{entry.question}</h3>
+              <p>{entry.answer}</p>
+            </motion.article>
+          ))}
+          <div className="persona-pagination" aria-label="Q&A archive pagination">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(current - 1, 0))}
+              disabled={page === 0}
+              aria-label="Previous Q&A page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span>
+              {page + 1} / {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(current + 1, pageCount - 1))}
+              disabled={page >= pageCount - 1}
+              aria-label="Next Q&A page"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<(typeof gallery)[number] | null>(null);
@@ -644,10 +890,16 @@ export default function Home() {
   const [inquiryForm, setInquiryForm] = useState<InquiryForm>(inquiryInitialState);
   const [inquiryStatus, setInquiryStatus] = useState<InquiryStatus>("idle");
   const [inquiryNotice, setInquiryNotice] = useState("");
+  const [turnstileConfigLoaded, setTurnstileConfigLoaded] = useState(false);
+  const [turnstileReady, setTurnstileReady] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
   const heroRef = useRef<HTMLDivElement>(null);
   const heroAudioRef = useRef<HTMLAudioElement>(null);
   const heroVideoRefs = useRef<Array<HTMLVideoElement | null>>([]);
   const skillActionVideoRef = useRef<HTMLVideoElement>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const lenis = new Lenis({ lerp: 0.08, wheelMultiplier: 0.9 });
@@ -692,6 +944,76 @@ export default function Home() {
     const timer = window.setTimeout(() => setLoading(false), 1850);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/turnstile/site-key", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((config: { siteKey?: string; enabled?: boolean } | null) => {
+        if (cancelled) {
+          return;
+        }
+
+        setTurnstileSiteKey(config?.siteKey || "");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTurnstileSiteKey("");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setTurnstileConfigLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!inquiryOpen) {
+      if (turnstileWidgetIdRef.current && window.turnstile?.remove) {
+        window.turnstile.remove(turnstileWidgetIdRef.current);
+      }
+
+      turnstileWidgetIdRef.current = null;
+      return;
+    }
+
+    if (
+      !turnstileSiteKey ||
+      !turnstileReady ||
+      !turnstileContainerRef.current ||
+      !window.turnstile ||
+      turnstileWidgetIdRef.current
+    ) {
+      return;
+    }
+
+    turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+      sitekey: turnstileSiteKey,
+      theme: "dark",
+      size: "flexible",
+      callback: (token) => {
+        setTurnstileToken(token);
+        if (inquiryStatus === "error") {
+          setInquiryStatus("idle");
+          setInquiryNotice("");
+        }
+      },
+      "expired-callback": () => {
+        setTurnstileToken("");
+      },
+      "error-callback": () => {
+        setTurnstileToken("");
+        setInquiryStatus("error");
+        setInquiryNotice("보안 인증을 다시 완료해주세요.");
+      },
+    });
+  }, [inquiryOpen, inquiryStatus, turnstileReady, turnstileSiteKey]);
 
   useEffect(() => {
     heroVideoRefs.current.forEach((video, index) => {
@@ -801,6 +1123,14 @@ export default function Home() {
     setSkillActionSoundEnabled(true);
   };
 
+  const resetTurnstile = () => {
+    setTurnstileToken("");
+
+    if (turnstileWidgetIdRef.current && window.turnstile) {
+      window.turnstile.reset(turnstileWidgetIdRef.current);
+    }
+  };
+
   const openInquiry = () => {
     setInquiryOpen(true);
     setInquiryStatus("idle");
@@ -809,6 +1139,7 @@ export default function Home() {
 
   const closeInquiry = () => {
     if (inquiryStatus !== "sending") {
+      setTurnstileToken("");
       setInquiryOpen(false);
     }
   };
@@ -823,6 +1154,13 @@ export default function Home() {
 
   const submitInquiry = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (turnstileSiteKey && !turnstileToken) {
+      setInquiryStatus("error");
+      setInquiryNotice("문의 발송 전에 보안 인증을 완료해주세요.");
+      return;
+    }
+
     setInquiryStatus("sending");
     setInquiryNotice("");
 
@@ -832,7 +1170,10 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(inquiryForm),
+        body: JSON.stringify({
+          ...inquiryForm,
+          turnstileToken,
+        }),
       });
       const result = (await response.json().catch(() => null)) as { message?: string } | null;
 
@@ -846,6 +1187,10 @@ export default function Home() {
     } catch (error) {
       setInquiryStatus("error");
       setInquiryNotice(error instanceof Error ? error.message : "문의 발송에 실패했습니다.");
+    } finally {
+      if (turnstileSiteKey) {
+        resetTurnstile();
+      }
     }
   };
 
@@ -855,6 +1200,13 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
+      {turnstileSiteKey ? (
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="afterInteractive"
+          onLoad={() => setTurnstileReady(true)}
+        />
+      ) : null}
       <IntroLoader loading={loading} />
       <ParticleField />
       <MagneticCursor />
@@ -1143,6 +1495,8 @@ export default function Home() {
             </div>
           </motion.div>
         </section>
+
+        <PersonaQASection />
 
         <section className="section-wrap">
           <SectionHeader
@@ -1439,7 +1793,22 @@ export default function Home() {
                     required
                   />
                 </label>
-                <button type="submit" className="inquiry-submit" disabled={inquiryStatus === "sending"}>
+                <div className="turnstile-shell">
+                  {turnstileSiteKey ? (
+                    <div ref={turnstileContainerRef} className="turnstile-widget" />
+                  ) : (
+                    <p>
+                      {turnstileConfigLoaded
+                        ? "Turnstile site key is not configured."
+                        : "보안 인증 설정을 확인하는 중입니다."}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  className="inquiry-submit"
+                  disabled={inquiryStatus === "sending" || Boolean(turnstileSiteKey && !turnstileToken)}
+                >
                   {inquiryStatus === "sending" ? <LoaderCircle className="animate-spin" size={18} /> : <Send size={18} />}
                   <span>{inquiryStatus === "sending" ? "전송 중..." : "milli@molluhub.com 으로 문의 보내기"}</span>
                 </button>

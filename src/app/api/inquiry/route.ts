@@ -5,6 +5,7 @@ import nodemailer from "nodemailer";
 export const runtime = "nodejs";
 
 const recipient = "milli@molluhub.com";
+const siteverifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 let sesClient: SESClient | null = null;
 
 type InquiryPayload = {
@@ -14,6 +15,14 @@ type InquiryPayload = {
   company?: unknown;
   message?: unknown;
   website?: unknown;
+  turnstileToken?: unknown;
+};
+
+type TurnstileResponse = {
+  success: boolean;
+  "error-codes"?: string[];
+  hostname?: string;
+  challenge_ts?: string;
 };
 
 function env(name: string) {
@@ -31,6 +40,55 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function getClientIp(request: Request) {
+  return (
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    undefined
+  );
+}
+
+async function verifyTurnstileToken(token: string, request: Request) {
+  const secret = env("TURNSTILE_SECRET_KEY");
+
+  if (!secret) {
+    console.warn("TURNSTILE_SECRET_KEY is missing; inquiry Turnstile validation skipped.");
+    return { ok: true };
+  }
+
+  if (!token || token.length > 2048) {
+    return { ok: false, message: "문의 발송 전에 보안 인증을 완료해주세요." };
+  }
+
+  const response = await fetch(siteverifyUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      secret,
+      response: token,
+      remoteip: getClientIp(request),
+      idempotency_key: crypto.randomUUID(),
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return { ok: false, message: "보안 인증 확인에 실패했습니다. 잠시 후 다시 시도해주세요." };
+  }
+
+  const result = (await response.json()) as TurnstileResponse;
+
+  if (!result.success) {
+    console.warn("Turnstile validation failed", result["error-codes"] || []);
+    return { ok: false, message: "보안 인증이 만료되었거나 유효하지 않습니다. 다시 완료해주세요." };
+  }
+
+  return { ok: true };
 }
 
 function getApiEndpoint() {
@@ -131,6 +189,7 @@ export async function POST(request: Request) {
   const phone = asText(payload.phone);
   const company = asText(payload.company);
   const message = asText(payload.message);
+  const turnstileToken = asText(payload.turnstileToken);
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   if (!name || !emailPattern.test(email) || message.length < 10) {
@@ -138,6 +197,12 @@ export async function POST(request: Request) {
       { ok: false, message: "이름, 이메일, 문의 내용을 확인해주세요." },
       { status: 400 },
     );
+  }
+
+  const turnstile = await verifyTurnstileToken(turnstileToken, request);
+
+  if (!turnstile.ok) {
+    return NextResponse.json({ ok: false, message: turnstile.message }, { status: 400 });
   }
 
   const sender = env("AWS_SES_EMAIL_SENDER_ADDRESS");
@@ -151,20 +216,21 @@ export async function POST(request: Request) {
 
   const safeName = escapeHtml(name);
   const safeEmail = escapeHtml(email);
-  const safePhone = escapeHtml(phone || "미기재");
-  const safeCompany = escapeHtml(company || "미기재");
+  const safePhone = escapeHtml(phone || "Not provided");
+  const safeCompany = escapeHtml(company || "Not provided");
   const safeMessage = escapeHtml(message).replaceAll("\n", "<br />");
-  const subject = `[darima.xyz] 홈페이지 제작문의 - ${name}${company ? ` / ${company}` : ""}`;
+  const subject = `[darima.xyz] Homepage inquiry - ${name}${company ? ` / ${company}` : ""}`;
   const textBody = [
-    "darima.xyz 홈페이지 제작문의",
+    "darima.xyz homepage production inquiry",
     "Source: https://www.darima.xyz/ / AYAME cinematic landing page",
+    "Turnstile: verified",
     "",
-    `이름: ${name}`,
-    `회사: ${company || "미기재"}`,
-    `이메일: ${email}`,
-    `연락처: ${phone || "미기재"}`,
+    `Name: ${name}`,
+    `Company: ${company || "Not provided"}`,
+    `Email: ${email}`,
+    `Phone: ${phone || "Not provided"}`,
     "",
-    "문의 내용:",
+    "Message:",
     message,
   ].join("\n");
 
@@ -175,21 +241,22 @@ export async function POST(request: Request) {
       <div style="max-width:640px;margin:0 auto;border:1px solid rgba(255,255,255,.12);background:rgba(13,16,32,.86);box-shadow:0 0 44px rgba(176,38,255,.22);">
         <div style="padding:24px 24px 18px;border-bottom:1px solid rgba(255,255,255,.1);">
           <p style="margin:0 0 8px;color:#ff4fd8;font-size:12px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;">DARIMA // LUDGI INQUIRY</p>
-          <h1 style="margin:0;color:#fff;font-size:26px;line-height:1.18;">홈페이지 제작문의가 도착했습니다.</h1>
+          <h1 style="margin:0;color:#fff;font-size:26px;line-height:1.18;">Homepage inquiry received.</h1>
           <p style="margin:10px 0 0;color:#c4b5fd;font-size:13px;">Source: darima.xyz / AYAME cinematic landing page</p>
+          <p style="margin:8px 0 0;color:#86efac;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">Turnstile verified</p>
         </div>
         <div style="padding:24px;">
           <table style="width:100%;border-collapse:collapse;font-size:14px;">
-            <tr><td style="padding:10px 0;color:#9ca3af;width:110px;">이름</td><td style="padding:10px 0;color:#fff;">${safeName}</td></tr>
-            <tr><td style="padding:10px 0;color:#9ca3af;">회사</td><td style="padding:10px 0;color:#fff;">${safeCompany}</td></tr>
-            <tr><td style="padding:10px 0;color:#9ca3af;">이메일</td><td style="padding:10px 0;color:#fff;">${safeEmail}</td></tr>
-            <tr><td style="padding:10px 0;color:#9ca3af;">연락처</td><td style="padding:10px 0;color:#fff;">${safePhone}</td></tr>
+            <tr><td style="padding:10px 0;color:#9ca3af;width:110px;">Name</td><td style="padding:10px 0;color:#fff;">${safeName}</td></tr>
+            <tr><td style="padding:10px 0;color:#9ca3af;">Company</td><td style="padding:10px 0;color:#fff;">${safeCompany}</td></tr>
+            <tr><td style="padding:10px 0;color:#9ca3af;">Email</td><td style="padding:10px 0;color:#fff;">${safeEmail}</td></tr>
+            <tr><td style="padding:10px 0;color:#9ca3af;">Phone</td><td style="padding:10px 0;color:#fff;">${safePhone}</td></tr>
           </table>
           <div style="margin-top:18px;padding:18px;border:1px solid rgba(176,38,255,.28);background:rgba(5,6,10,.62);">
             <p style="margin:0 0 10px;color:#ff4fd8;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;">Message</p>
             <p style="margin:0;color:#f3f4f6;font-size:15px;line-height:1.75;">${safeMessage}</p>
           </div>
-          <p style="margin:18px 0 0;color:#9ca3af;font-size:12px;">이 메일은 https://www.darima.xyz/ 우측 하단 제작문의 버튼에서 발송되었습니다.</p>
+          <p style="margin:18px 0 0;color:#9ca3af;font-size:12px;">This message was submitted from https://www.darima.xyz/ through the floating inquiry form.</p>
         </div>
       </div>
     </div>
